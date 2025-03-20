@@ -3,10 +3,9 @@ UniFi authentication class.
 Authenticates with the UniFi Firewall API and stores the token in the OS's Keyring Store securely.
 """
 import requests
+from py_tokens.jwt_manager import JwtManager
+from py_unifi.constants import UNIFI_ENDPOINTS, UnifiConstants
 from requests import exceptions as request_exceptions
-
-from ..py_tokens.jwt_manager import JwtManager
-from ..py_unifi.constants import UNIFI_ENDPOINTS, UnifiConstants
 
 
 class UnifiAuth:
