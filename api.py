@@ -1,10 +1,10 @@
 """
 High-level UniFi API that exposes domain-specific operations.
 """
-from ..py_abstractions.rest import Delete, Get, Post, Put
-from ..py_dns import DDNS
-from ..py_unifi.client import UnifiClient
-from ..py_unifi.constants import UnifiConstants
+from py_abstractions.rest import Delete, Get, Post, Put
+from py_dns import DDNS
+from py_unifi.client import UnifiClient
+from py_unifi.constants import UnifiConstants
 
 
 class UnifiApi(Get, Post, Put, Delete):
