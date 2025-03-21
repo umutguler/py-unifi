@@ -2,9 +2,13 @@
 Low-level UniFi client that exposes raw HTTP methods and ensures authentication.
 """
 
+import py_logging
+from py_abstractions.rest import Delete, Get, Post, Put
 from requests import exceptions as request_exceptions
 
 from .auth import UnifiAuth
+
+logging = py_logging.get_logger(__name__)
 
 
 def requires_auth(func):
@@ -16,7 +20,7 @@ def requires_auth(func):
     return wrapper
 
 
-class UnifiClient:
+class UnifiClient(Get, Post, Put, Delete):
     """
     Low-level UniFi client that exposes raw HTTP methods.
     """
@@ -35,10 +39,11 @@ class UnifiClient:
         Ensure we have a valid UniFi token. If not, attempt a login.
         """
         if not self.auth.is_logged_in:
+            logging.debug("Not logged in. Attempting login.")
             self.auth.login()
 
     @requires_auth
-    def request(self, method, path, json_data=None):
+    def __request(self, method, path, data=None):
         """HTTP request method that ensures authentication."""
         url = self.base_url + path
         headers = {
@@ -52,14 +57,14 @@ class UnifiClient:
             headers["x-csrf-token"] = csrf_token
 
         response = self.session.request(
-            method.upper(), url, headers=headers, json=json_data
+            method.upper(), url, headers=headers, json=data
         )
 
         if response.status_code == 401 and self._retries < self._max_retries:
             self._retries += 1
             self.auth.token_manager.clear_token()
             self.auth.login()
-            return self.request(method, path, json_data)
+            return self.__request(method, path, data)
 
         if response.status_code == 429:
             raise request_exceptions.HTTPError(
@@ -75,21 +80,25 @@ class UnifiClient:
         return response.json() if response.text else {}
 
     @requires_auth
-    def get(self, path, json_data=None):
+    def get(self, resource, data=None):
         """Generic GET method."""
-        return self.request("GET", path, json_data)
+        logging.debug("GET %s", resource)
+        return self.__request("GET", resource, data)
 
     @requires_auth
-    def post(self, path, json_data=None):
+    def post(self, resource, data=None):
         """Generic POST method."""
-        return self.request("POST", path, json_data)
+        logging.debug("POST %s", resource)
+        return self.__request("POST", resource, data)
 
     @requires_auth
-    def put(self, path, json_data=None):
+    def put(self, resource, data=None):
         """Generic PUT method."""
-        return self.request("PUT", path, json_data)
+        logging.debug("PUT %s", resource)
+        return self.__request("PUT", resource, data)
 
     @requires_auth
-    def delete(self, path, json_data=None):
+    def delete(self, resource, data=None):
         """Generic DELETE method."""
-        return self.request("DELETE", path, json_data)
+        logging.debug("DELETE %s", resource)
+        return self.__request("DELETE", resource, data)
