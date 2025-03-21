@@ -1,13 +1,16 @@
 """
 High-level UniFi API that exposes domain-specific operations.
 """
+import py_logging
 from py_abstractions.rest import Delete, Get, Post, Put
 from py_dns import DDNS
 from py_unifi.client import UnifiClient
 from py_unifi.constants import UnifiConstants
 
+logging = py_logging.get_logger(__name__)
 
-class UnifiApi(Get, Post, Put, Delete):
+
+class UnifiApi:
     """
     High-level UniFi API that provides domain-specific operations.
     For CRUD-like operations, we map get/post/put/delete to the underlying UnifiClient.
@@ -28,33 +31,9 @@ class UnifiApi(Get, Post, Put, Delete):
         """
         Log out of the UniFi Firewall API.
         """
+        logging.info("Logging out of the UniFi Firewall API")
         return self.client.auth.logout()
 
-    def get(self, resource, data=None):
-        """
-        Perform a GET request to the specified resource with optional data (query params).
-        """
-        return self.client.get(resource, data)
-
-    def post(self, resource, data=None):
-        """
-        Perform a POST request to the specified resource with optional data.
-        """
-        return self.client.post(resource, data)
-
-    def put(self, resource, data=None):
-        """
-        Perform a PUT request to the specified resource with optional data.
-        """
-        return self.client.put(resource, data)
-
-    def delete(self, resource, data=None):
-        """
-        Perform a DELETE request to the specified resource with optional data.
-        """
-        return self.client.delete(resource, data)
-
-    # Domain-specific example:
     def update_firewall_group(self, data):
         """Convenience method to update a firewall group."""
         path = UnifiConstants.get_firewallgroup_path(
@@ -70,4 +49,7 @@ class UnifiApi(Get, Post, Put, Delete):
             "_id": data["firewallgroup"]
         }
 
-        return self.put(path, payload)
+        logging.debug("Updating firewall group.")
+        logging.debug("Firewall Rule: %s", payload['name'])
+        logging.debug("IP Addresses: %s", payload['group_members'])
+        return self.client.put(path, payload)
