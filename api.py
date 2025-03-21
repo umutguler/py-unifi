@@ -49,7 +49,7 @@ class UnifiApi:
             "_id": data["firewallgroup"]
         }
 
-        logging.debug("Updating firewall group.")
-        logging.debug("Firewall Rule: %s", payload['name'])
-        logging.debug("IP Addresses: %s", payload['group_members'])
+        logging.info("Updating firewall group.")
+        logging.info("Firewall Rule: %s", payload['name'])
+        logging.info("IP Addresses: %s", payload['group_members'])
         return self.client.put(path, payload)
