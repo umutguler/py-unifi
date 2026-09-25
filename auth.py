@@ -49,14 +49,6 @@ class UnifiAuth:
         if self.is_logged_in:
             return True
 
-        response = self.session.get(f"{self.base_url}/", timeout=REQUEST_TIMEOUT)
-        if response.status_code not in [200, 401]:
-            logging.error("Unexpected GET status code during init: %s",
-                          response.status_code)
-            raise request_exceptions.HTTPError(
-                f"Unexpected GET status code during init: {response.status_code}"
-            )
-
         login_url = f"{self.base_url}{UNIFI_ENDPOINTS['LOGIN']}"
         headers = UnifiConstants.get_headers(self.base_url)
         headers["Referer"] = f"{self.base_url}/login"
