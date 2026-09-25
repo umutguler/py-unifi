@@ -2,6 +2,9 @@
 Constants for UniFi API endpoints, paths, and any other shared constants.
 """
 
+# Seconds; without it a hung gateway blocks the caller forever.
+REQUEST_TIMEOUT = 30
+
 UNIFI_ENDPOINTS = {
     "LOGIN": "/api/auth/login",
     "LOGOUT": "/api/auth/logout",
@@ -26,6 +29,6 @@ class UnifiConstants:
         }
 
     @staticmethod
-    def get_firewallgroup_path(site, firewallgroup_id):
-        """Formatted URL path UniFI firewall group."""
-        return f"/proxy/network/api/s/{site}/rest/firewallgroup/{firewallgroup_id}"
+    def get_firewallgroup_path(site, firewallgroup_id=""):
+        """Formatted URL path UniFI firewall group, or of all groups if no ID is given."""
+        return f"/proxy/network/api/s/{site}/rest/firewallgroup/{firewallgroup_id}".rstrip("/")

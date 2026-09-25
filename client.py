@@ -7,6 +7,7 @@ from py_abstractions.rest import Delete, Get, Post, Put
 from requests import exceptions as request_exceptions
 
 from .auth import UnifiAuth
+from .constants import REQUEST_TIMEOUT
 
 logging = py_logging.get_logger(__name__)
 
@@ -25,14 +26,12 @@ class UnifiClient(Get, Post, Put, Delete):
     Low-level UniFi client that exposes raw HTTP methods.
     """
 
-    def __init__(self, base_url, username, password, verify_ssl=False,
-                 service_name="UnifiApiClientToken"):
+    def __init__(self, base_url, username, password, verify_ssl=True,
+                 service_name="UnifiApiClientToken", api_key=None):
         self.auth = UnifiAuth(base_url, username, password,
-                              verify_ssl, service_name)
+                              verify_ssl, service_name, api_key)
         self.base_url = self.auth.base_url
         self.session = self.auth.session
-        self._retries = 0
-        self._max_retries = 1
 
     def ensure_logged_in(self):
         """
@@ -42,8 +41,7 @@ class UnifiClient(Get, Post, Put, Delete):
             logging.debug("Not logged in. Attempting login.")
             self.auth.login()
 
-    @requires_auth
-    def __request(self, method, path, data=None):
+    def __request(self, method, path, data=None, retry=True):
         """HTTP request method that ensures authentication."""
         url = self.base_url + path
         headers = {
@@ -57,21 +55,20 @@ class UnifiClient(Get, Post, Put, Delete):
             headers["x-csrf-token"] = csrf_token
 
         response = self.session.request(
-            method.upper(), url, headers=headers, json=data
+            method.upper(), url, headers=headers, json=data, timeout=REQUEST_TIMEOUT
         )
 
-        if response.status_code == 401 and self._retries < self._max_retries:
-            self._retries += 1
+        # Token revoked or expired server-side (e.g. gateway reboot): log in again, once.
+        if response.status_code == 401 and retry:
             self.auth.token_manager.clear_token()
             self.auth.login()
-            return self.__request(method, path, data)
+            return self.__request(method, path, data, retry=False)
 
         if response.status_code == 429:
             raise request_exceptions.HTTPError(
                 "Rate limit hit (429). Wait before retrying."
             )
 
-        self._retries = 0
         if not response.ok:
             raise request_exceptions.HTTPError(
                 f"Request {method} {url} failed: {response.status_code}, {response.text}"

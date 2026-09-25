@@ -5,7 +5,7 @@ Authenticates with the UniFi Firewall API and stores the token in the OS's Keyri
 import py_logging
 import requests
 from py_tokens.jwt_manager import JwtManager
-from py_unifi.constants import UNIFI_ENDPOINTS, UnifiConstants
+from py_unifi.constants import REQUEST_TIMEOUT, UNIFI_ENDPOINTS, UnifiConstants
 from requests import exceptions as request_exceptions
 
 logging = py_logging.get_logger(__name__)
@@ -19,20 +19,24 @@ class UnifiAuth:
     """
 
     def __init__(self, base_url, username, password, verify_ssl,
-                 service_name="UnifiApiClientToken"):
+                 service_name="UnifiApiClientToken", api_key=None):
         self.base_url = base_url.rstrip("/")
         self.username = username
         self.password = password
+        self.api_key = api_key
         self.verify_ssl = verify_ssl
         self.session = requests.Session()
         self.session.verify = verify_ssl
+        # An API key (UniFi OS 4.1+ / Network 9+) authenticates every request: no login, token or CSRF.
+        if api_key:
+            self.session.headers["X-API-KEY"] = api_key
         self.token_manager = JwtManager(self.session, service_name)
 
     @property
     def is_logged_in(self) -> bool:
-        """Determine if we are 'logged in' by checking if our token is valid."""
-        logged_in = self.token_manager.is_token_valid()
-        logging.info("Logged in: %s", logged_in)
+        """Determine if we are 'logged in': an API key, or a token that is still valid."""
+        logged_in = bool(self.api_key) or self.token_manager.is_token_valid()
+        logging.debug("Logged in: %s", logged_in)
 
         return logged_in
 
@@ -45,7 +49,7 @@ class UnifiAuth:
         if self.is_logged_in:
             return True
 
-        response = self.session.get(f"{self.base_url}/")
+        response = self.session.get(f"{self.base_url}/", timeout=REQUEST_TIMEOUT)
         if response.status_code not in [200, 401]:
             logging.error("Unexpected GET status code during init: %s",
                           response.status_code)
@@ -58,10 +62,11 @@ class UnifiAuth:
         headers["Referer"] = f"{self.base_url}/login"
 
         payload = {"username": self.username, "password": self.password}
-        logging.debug("Logging in to UniFi Firewall API: URL %s\nPayload: %s",
-                      login_url, payload)
+        logging.debug("Logging in to UniFi Firewall API: URL %s as %s",
+                      login_url, self.username)
 
-        response = self.session.post(login_url, json=payload, headers=headers)
+        response = self.session.post(login_url, json=payload, headers=headers,
+                                     timeout=REQUEST_TIMEOUT)
 
         if response.status_code == 200:
             logging.debug("Login successful.")
@@ -95,6 +100,8 @@ class UnifiAuth:
         Returns True if we are now 'logged out' (meaning token is invalid/cleared),
         or if no valid token was present in the first place.
         """
+        if self.api_key:
+            return True
         if not self.is_logged_in:
             logging.debug("Already logged out. Clearing token.")
             self.token_manager.clear_token()
@@ -110,7 +117,8 @@ class UnifiAuth:
         }
 
         payload = {"TOKEN": self.token_manager.token_info["token"]}
-        response = self.session.post(logout_url, json=payload, headers=headers)
+        response = self.session.post(logout_url, json=payload, headers=headers,
+                                     timeout=REQUEST_TIMEOUT)
 
         if response.ok:
             self.token_manager.clear_token()
